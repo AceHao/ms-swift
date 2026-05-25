@@ -183,6 +183,13 @@ class Template(ProcessorMixin):
         if response_prefix is None:
             response_prefix = self.response_prefix
         if response_prefix is not None:
+            if inputs is not None and '{bot_name}' in response_prefix:
+                bot_name = inputs.extra_kwargs.get('bot_name')
+                if not bot_name:
+                    import re
+                    m = re.match(r"^(.+?)'s persona:", inputs.system or '')
+                    bot_name = m.group(1) if m else ''
+                response_prefix = response_prefix.replace('{bot_name}', bot_name)
             return response_prefix
         elif not self.use_chat_template:
             return ''
