@@ -255,8 +255,12 @@ class MegatronGRPOTrainer(MegatronRolloutMixin, MegatronRLHFTrainer):
         return RerunDataIterator(iter(inputs))
 
     def _batch_encode(self, infer_requests: List[Dict], template: Template, strict: bool, **kwargs):
-        # borrowed from swift/infer_engine/infer_engine.py
-        max_workers = max(min(32, os.cpu_count(), len(infer_requests)), 1)
+        # Force serial encoding: multimodal processors (e.g. gemma4) mutate HF fast-tokenizer
+        # state (set_truncation_and_padding) inside __call__, which the Rust-backed tokenizer
+        # rejects under concurrent access with `RuntimeError: Already borrowed`. The swift
+        # rlhf path (swift/rlhf_trainers/grpo_trainer.py:84) already pins this to 1 for the
+        # same reason; this restores parity for the megatron path.
+        max_workers = 1
         error_list = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(template.encode, infer_request, **kwargs) for infer_request in infer_requests]
